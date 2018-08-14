@@ -1,0 +1,2 @@
+#!/bin/sh
+perf record -e sdt_libpthread:mutex_acquired,sdt_libpthread:mutex_acquired_1,sdt_libpthread:mutex_acquired_2,sdt_libpthread:mutex_acquired_3,sdt_libpthread:mutex_entry,sdt_libpthread:mutex_entry_1,sdt_libpthread:mutex_init,sdt_libpthread:mutex_release,sdt_libpthread:mutex_release_1,sdt_libpthread:mutex_release_2,sdt_libpthread:mutex_release_3 $*
