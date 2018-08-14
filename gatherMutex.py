@@ -26,11 +26,11 @@ class Lock:
 		self.released = 0
 		self.attempted = 0
 		self.held = 0 # delta between acquired and release
-		# self.held_min = sys.maxint		// Check
+		self.held_min = sys.maxint
 		self.held_min = 0
 		self.held_max = 0
 		self.wait = 0 # delta between entry and acquired
-		# self.wait_min = sys.maxint		// Check
+		self.wait_min = sys.maxint
 		self.wait_min = 0
 		self.wait_max = 0
 		self.pending = 0
@@ -38,20 +38,19 @@ class Lock:
 	def output_header(self):
 		print "%12s %12s %12s %12s %12s %12s %12s %12s %12s" % ("acquired", "waited", "minWait", "maxWait", "avgWait", "held", "minHeld", "maxHeld", "avgHeld")
 
-	def output(self):		# // Check this routine
+	def output(self):
 		# compute average wait and hold times
 		if (self.acquired != 0):
-			avgWait = (self.wait/self.acquired)/1000
-			avgHeld = (self.held/self.acquired)/1000
+			avgWait = float(self.wait)/float(self.acquired)/1000.0
+			avgHeld = float(self.held)/float(self.acquired)/1000.0
 		else:
-			avgWait = 0
-			avgHeld = 0
+			avgWait = 0.0
+			avgHeld = 0.0
 
-		# print "%9u %9.2f %9.2f %9.2f %9.2f %9.2f %9.2f %9.2f %9.2f" \		# Check: Having trouble with %f formatting
-		print "%12s %12s %12s %12s %12s %12s %12s %12s %12s"  \
+		print "%12u %12.3f %12.3f %12.3f %12.3f %12.3f %12.3f %12.3f %12.3f" \
 		      % (self.acquired, \
-			 self.wait/1000, self.wait_min/1000, self.wait_max/1000, avgWait, \
-			 self.held/1000, self.held_min/1000, self.held_max/1000, avgHeld  )
+			 float(self.wait)/1000000.0, float(self.wait_min)/1000000.0, float(self.wait_max)/float(1000000.0), avgWait, \
+			 float(self.held)/1000000.0, float(self.held_min)/1000000.0, float(self.held_max)/float(1000000.0), avgHeld  )
 
 class CPU:
 	def __init__(self):
@@ -203,8 +202,6 @@ class Event_mutex_acquired_7 ( Event ):
 		task = super(Event_mutex_acquired_7, self).process()
 		addLock(self.tid, self.lid)
 
-		# Check: Logic for min/max wait times
-
 		# wait = delta b/w mutex entry & acquired
 		waitTime = (curr_timestamp - task.locks[self.lid].last_event)
 		task.locks[self.lid].wait += waitTime
@@ -239,8 +236,6 @@ class Event_mutex_release_7 ( Event ):
 		addLock(self.tid, self.lid)
 
 		task.locks[self.lid].released = curr_timestamp
-
-		# Check: Logic for min/max held times
 
 		# held = delta b/w mutex acquired & released
 		heldTime = (curr_timestamp - task.locks[self.lid].last_event)
