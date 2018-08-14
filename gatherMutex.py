@@ -27,13 +27,26 @@ class Lock:
 		self.attempted = 0
 		self.held = 0 # delta between acquired and release
 		self.held_min = sys.maxint
-		self.held_min = 0
 		self.held_max = 0
 		self.wait = 0 # delta between entry and acquired
 		self.wait_min = sys.maxint
-		self.wait_min = 0
 		self.wait_max = 0
 		self.pending = 0
+
+	def accumulate(self, lock):
+		self.acquired += lock.acquired
+		self.released += lock.released
+		self.attempted += lock.attempted
+		self.held += lock.held
+		if lock.held_min < self.held_min:
+			self.held_min = lock.held_min
+		if lock.held_max > self.held_max:
+			self.held_max = lock.held_max
+		self.wait += lock.wait
+		if lock.wait_min < self.wait_min:
+			self.wait_min = lock.wait_min
+		if lock.wait_max > self.wait_max:
+			self.wait_max = lock.wait_max
 
 	def output_header(self):
 		print "%12s %12s %12s %12s %12s %12s %12s %12s %12s" % ("acquired", "waited", "minWait", "maxWait", "avgWait", "held", "minHeld", "maxHeld", "avgHeld")
@@ -41,16 +54,24 @@ class Lock:
 	def output(self):
 		# compute average wait and hold times
 		if (self.acquired != 0):
-			avgWait = float(self.wait)/float(self.acquired)/1000.0
-			avgHeld = float(self.held)/float(self.acquired)/1000.0
+			avgWait = float(self.wait)/float(self.acquired)/1000000.0
+			avgHeld = float(self.held)/float(self.acquired)/1000000.0
 		else:
 			avgWait = 0.0
 			avgHeld = 0.0
 
+		wait_min = self.wait_min
+		if wait_min == sys.maxint:
+			wait_min = 0
+
+		held_min = self.held_min
+		if held_min == sys.maxint:
+			held_min = 0
+
 		print "%12u %12.3f %12.3f %12.3f %12.3f %12.3f %12.3f %12.3f %12.3f" \
 		      % (self.acquired, \
-			 float(self.wait)/1000000.0, float(self.wait_min)/1000000.0, float(self.wait_max)/float(1000000.0), avgWait, \
-			 float(self.held)/1000000.0, float(self.held_min)/1000000.0, float(self.held_max)/float(1000000.0), avgHeld  )
+			 float(self.wait)/1000000.0, float(wait_min)/1000000.0, float(self.wait_max)/float(1000000.0), avgWait, \
+			 float(self.held)/1000000.0, float(held_min)/1000000.0, float(self.held_max)/float(1000000.0), avgHeld  )
 
 class CPU:
 	def __init__(self):
@@ -264,6 +285,7 @@ def trace_end():
 	mutexTotals()
 
 def mutexTotals():
+	locks = {}
 	# print header
 	# print "%20s" % (''),
 	for tid in tasks:
@@ -277,6 +299,19 @@ def mutexTotals():
 		for lid in tasks[tid].locks:
 			print "%16x" % (lid),
 			tasks[tid].locks[lid].output()
+			if lid not in locks:
+				locks[lid] = Lock()
+			locks[lid].accumulate(tasks[tid].locks[lid])
+
+	print ""
+	print "Task [%9s]" % ("ALL")
+	print "            lock",
+	for lid in locks:
+		locks[lid].output_header()
+		break
+	for lid in locks:
+		print "%16x" % (lid),
+		locks[lid].output()
 
 def sdt_libpthread__pthread_create(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
 	common_callchain, __probe_ip):
