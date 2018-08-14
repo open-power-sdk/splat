@@ -1,13 +1,114 @@
-# Licensed under the terms of the GNU GPL License version 2
+#!/usr/bin/python
+# Copyright (c) IBM 2017 All Rights Reserved.
+# Project name: splat
+# This project is licensed under the GPL License 2.0, see LICENSE.
 
 import os
 import sys
 import argparse
+import subprocess
 
-sys.path.append(os.environ['PERF_EXEC_PATH'] + \
-	'/scripts/python/Perf-Trace-Util/lib/Perf/Trace')
+if 'PERF_EXEC_PATH' in os.environ:
+	sys.path.append(os.environ['PERF_EXEC_PATH'] + \
+		'/scripts/python/Perf-Trace-Util/lib/Perf/Trace')
 
-from perf_trace_context import *
+parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
+	description='''
+Report per-task, per-process, and system-wide lock statistics
+
+Process a perf format trace file containing some or all of the following event sets:
+- sdt_libpthread:mutex_acquired
+- sdt_libpthread:mutex_entry
+- sdt_libpthread:mutex_init
+- sdt_libpthread:mutex_release
+- sched:sched_switch
+- sched:sched_migrate_task
+- sched:sched_process_fork, sched:sched_process_exec, sched:sched_process_exit
+
+Report the following statistics
+- per-process, perf-task, system-wide:
+  - per-lock:
+    - acquired count
+    - elapsed, minimum, maximum, average wait time
+    - elapsed, minimum, maximum, average hold time
+''',
+	epilog='''
+Establish tracepoints:
+$ perf probe --add sdt_libpthread:mutex_init
+$ perf probe --add sdt_libpthread:mutex_entry
+$ perf probe --add sdt_libpthread:mutex_acquired
+$ perf probe --add sdt_libpthread:mutex_release
+
+Note: there may be multiple tracepoints established at each "perf probe" step above.  All tracepoints should be recorded in subsequent steps.
+
+Record using perf (to perf.data file):
+$ perf record -e '{sdt_libpthread:mutex_init:sdt_libpthread:mutex_acquired,sdt_libpthread_mutex_entry,sdt_libpthread_mutex_release ...}' command
+
+Note: record all tracepoints established above.
+
+Generate report (from perf.data file):
+$ ./splat.py
+
+Or, record and report in a single step:
+$ ./splat.py --record all command
+''')
+parser.add_argument('--debug', action='store_true', help='enable debugging output')
+parser.add_argument('--window', type=int, help='maximum event sequence length for correcting out-of-order events', default=40)
+parser.add_argument('--record',
+	metavar='EVENTLIST',
+	help="record events (instead of generating report). "
+		"Specify event group(s) as a comma-separated list from "
+		"{all,pthread,sched}.")
+parser.add_argument('file_or_command',
+	nargs=argparse.REMAINDER,
+	help="the perf format data file to process (default: \"perf.data\"), or "
+		"the command string to record (with \"--record\")",
+	metavar='ARG',
+	default='perf.data')
+params = parser.parse_args()
+
+if params.record:
+	eventlist = ''
+	comma = ''
+	groups = params.record.split(',')
+	#if 'all' in groups or 'sched' in groups:
+	#	eventlist = eventlist + comma + "sched:sched_switch," \
+	#	"sched:sched_process_fork,sched:sched_process_exec," \
+	#	"sched:sched_process_exit"
+	#	comma = ','
+	#if 'all' in groups or 'pthread' in groups:
+	#	eventlist = eventlist + comma + \
+	#		'raw_syscalls:sys_enter,raw_syscalls:sys_exit'
+	#	comma = ','
+	if 'all' not in groups:
+		print "Only 'all' is currently supported for recording groups."
+		sys.exit(1)
+	eventlist = 'sdt_libpthread:*' # hack, should be refined
+	eventlist = '{' + eventlist + '}'
+	command = ['perf', 'record', '--quiet', '--all-cpus',
+		'--event', eventlist ] + params.file_or_command
+	if params.debug:
+		print command
+	subprocess.call(command)
+	params.file_or_command = []
+
+try:
+	from perf_trace_context import *
+except:
+	print "Relaunching under \"perf\" command..."
+	if len(params.file_or_command) == 0:
+		params.file_or_command = [ "perf.data" ]
+	sys.argv = ['perf', 'script', '-i' ] + params.file_or_command + [ '-s', sys.argv[0] ]
+	sys.argv.append('--')
+	sys.argv += ['--window', str(params.window)]
+	if params.debug:
+		sys.argv.append('--debug')
+	if params.debug:
+		print sys.argv
+	os.execvp("perf", sys.argv)
+	sys.exit(1)
+
+from Core import *
 from Core import *
 from Util import *
 
