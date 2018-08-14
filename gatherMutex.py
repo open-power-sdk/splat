@@ -280,8 +280,6 @@ def mutexTotals():
 			break
 		# print mutex list
 		for lid in tasks[tid].locks:
-			if lid == 0:
-				continue
 			print "%16x" % (lid),
 			tasks[tid].locks[lid].output()
 
