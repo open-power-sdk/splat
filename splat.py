@@ -116,7 +116,24 @@ global start_timestamp, curr_timestamp
 start_timestamp = 0
 curr_timestamp = 0
 
+events = []
+n_events = 0
+
 def process_event(event):
+	global events,n_events,curr_timestamp
+	i = n_events
+	while i > 0 and events[i-1].timestamp > event.timestamp:
+		i = i-1
+	events.insert(i,event)
+	if n_events < params.window:
+		n_events = n_events+1
+	else:
+		event = events[0]
+		# need to delete from events list now,
+		# because event.process() could reenter here
+		del events[0]
+		if event.timestamp < curr_timestamp:
+			sys.stderr.write("Error: OUT OF ORDER events detected.\n  Try increasing the size of the look-ahead window with --window=<n>\n")
 		event.process()
 
 class Lock:
@@ -383,6 +400,10 @@ def trace_begin():
 
 def trace_end():
 	print "in trace_end"
+	global events
+	for event in events:
+		event.process()
+
 	mutexTotals()
 
 def mutexTotals():
