@@ -12,6 +12,10 @@ if 'PERF_EXEC_PATH' in os.environ:
 	sys.path.append(os.environ['PERF_EXEC_PATH'] + \
 		'/scripts/python/Perf-Trace-Util/lib/Perf/Trace')
 
+def debug_print(s):
+	if params.debug:
+		print s
+
 parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
 	description='''
 Report per-task, per-process, and system-wide lock statistics
@@ -95,7 +99,7 @@ if params.record:
 try:
 	from perf_trace_context import *
 except:
-	print "Relaunching under \"perf\" command..."
+	debug_print("Relaunching under \"perf\" command...")
 	if len(params.file_or_command) == 0:
 		params.file_or_command = [ "perf.data" ]
 	sys.argv = ['perf', 'script', '-i' ] + params.file_or_command + [ '-s', sys.argv[0] ]
@@ -103,8 +107,7 @@ except:
 	sys.argv += ['--window', str(params.window)]
 	if params.debug:
 		sys.argv.append('--debug')
-	if params.debug:
-		print sys.argv
+	debug_print(sys.argv)
 	os.execvp("perf", sys.argv)
 	sys.exit(1)
 
@@ -257,7 +260,7 @@ def addLock(tid, lid):
 	except:
 		lock = Lock()
 		tasks[tid].locks[lid] = lock
-		print  "\tAdding new lock = 0x%x" %lid
+		debug_print("\tAdding new lock = 0x%x" % lid)
 
 class Event (object):
 
@@ -275,10 +278,10 @@ class Event (object):
 		except:
 			task = Task(start_timestamp, self.tid)
 			tasks[self.tid] = task
-			print  "Adding new task = %u" %self.tid
+			debug_print("Adding new task = %u" % self.tid)
 
 			if self.cpu not in task.cpus:
-				print"\tAdding new CPU %d" %self.cpu
+				debug_print("\tAdding new CPU %d" % self.cpu)
 				task.cpus[self.cpu] = CPU()
 		return task
 
@@ -296,7 +299,7 @@ class Event_mutex_init ( Event ):
 		if (start_timestamp == 0):
 			start_timestamp = curr_timestamp
 
-		print "[%7u] Inside Event_mutex_init::process, lid = 0x%x" % (self.tid, self.lid)
+		debug_print("[%7u] Inside Event_mutex_init::process, lid = 0x%x" % (self.tid, self.lid))
 		task = super(Event_mutex_init, self).process()
 		addLock(self.tid, self.lid)
 		task.locks[self.lid].timestamp = curr_timestamp
@@ -316,7 +319,7 @@ class Event_mutex_entry_3 ( Event ):
 		if (start_timestamp == 0):
 			start_timestamp = curr_timestamp
 
-		print "[%7u] Inside Event_mutex_entry_3::process, lid = 0x%x" % (self.tid, self.lid)
+		debug_print("[%7u] Inside Event_mutex_entry_3::process, lid = 0x%x" % (self.tid, self.lid))
 		task = super(Event_mutex_entry_3, self).process()
 		addLock(self.tid, self.lid)
 
@@ -337,7 +340,7 @@ class Event_mutex_acquired_7 ( Event ):
 		if (start_timestamp == 0):
 			start_timestamp = curr_timestamp
 
-		print "[%7u] Inside Event_mutex_acquired_7::process, lid = 0x%x" % (self.tid, self.lid)
+		debug_print("[%7u] Inside Event_mutex_acquired_7::process, lid = 0x%x" % (self.tid, self.lid))
 		task = super(Event_mutex_acquired_7, self).process()
 		addLock(self.tid, self.lid)
 
@@ -370,7 +373,7 @@ class Event_mutex_release_7 ( Event ):
 		if (start_timestamp == 0):
 			start_timestamp = curr_timestamp
 
-		print "[%7u] Inside Event_mutex_release_7::process, lid = 0x%x" % (self.tid, self.lid)
+		debug_print("[%7u] Inside Event_mutex_release_7::process, lid = 0x%x" % (self.tid, self.lid))
 		task = super(Event_mutex_release_7, self).process()
 		addLock(self.tid, self.lid)
 
@@ -392,18 +395,17 @@ def sdt_libpthread__mutex_destroy_1(event_name, context, common_cpu, common_secs
 	common_callchain, __probe_ip, arg1):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u, arg1=%u" % (__probe_ip, arg1)
-		print "Destroying mutex, id = 0x%x" %arg1
+		debug_print("Destroying mutex, id = 0x%x" % arg1)
 
 
 def trace_begin():
-	print "in trace_begin"
+	debug_print("in trace_begin")
 
 def trace_end():
-	print "in trace_end"
+	debug_print("in trace_end")
 	global events
 	for event in events:
 		event.process()
-
 	mutexTotals()
 
 def mutexTotals():
