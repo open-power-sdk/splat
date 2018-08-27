@@ -1,2 +1,9 @@
 #!/bin/sh
-perf record -e sdt_libpthread:mutex_acquired,sdt_libpthread:mutex_acquired_1,sdt_libpthread:mutex_acquired_2,sdt_libpthread:mutex_acquired_3,sdt_libpthread:mutex_entry,sdt_libpthread:mutex_entry_1,sdt_libpthread:mutex_init,sdt_libpthread:mutex_release,sdt_libpthread:mutex_release_1,sdt_libpthread:mutex_release_2,sdt_libpthread:mutex_release_3 $*
+eventlist='{'
+for i in $(perf list | grep 'sdt_libpthread:.*\[Tracepoint event]' | awk '{print $1}'); do
+	eventlist="$eventlist$comma$i"
+	comma=,
+done
+eventlist="$eventlist}"
+
+exec perf record -e "$eventlist" $*
