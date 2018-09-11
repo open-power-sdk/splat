@@ -69,6 +69,7 @@ parser.add_argument('file_or_command',
 		"the command string to record (with \"--record\")",
 	metavar='ARG',
 	default='perf.data')
+parser.add_argument('--api', type=int, help='use newer(2) perf API', default=1)
 params = parser.parse_args()
 
 if params.record:
@@ -105,6 +106,7 @@ except:
 	sys.argv = ['perf', 'script', '-i' ] + params.file_or_command + [ '-s', sys.argv[0] ]
 	sys.argv.append('--')
 	sys.argv += ['--window', str(params.window)]
+	sys.argv += ['--api', str(params.api)]
 	if params.debug:
 		sys.argv.append('--debug')
 	debug_print(sys.argv)
@@ -391,12 +393,14 @@ class Event_mutex_release_7 ( Event ):
 			task.locks[self.lid].held_max = heldTime
 
 
-def sdt_libpthread__mutex_destroy_1(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip, arg1):
+def sdt_libpthread__mutex_destroy_1_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
+	common_callchain, __probe_ip, arg1, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u, arg1=%u" % (__probe_ip, arg1)
 		debug_print("Destroying mutex, id = 0x%x" % arg1)
 
+def sdt_libpthread__mutex_destroy_1_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1):
+	sdt_libpthread__mutex_destroy_1_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, dummy_dict)
 
 def trace_begin():
 	debug_print("in trace_begin")
@@ -437,210 +441,277 @@ def mutexTotals():
 		print "%16x" % (lid),
 		locks[lid].output()
 
-def sdt_libpthread__pthread_create(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip):
+def sdt_libpthread__pthread_create_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u" % (__probe_ip)
 		pass
 
-def sdt_libpthread__pthread_create_1(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip, arg1, arg2, arg3, arg4):
+def sdt_libpthread__pthread_create_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
+	sdt_libpthread__pthread_create_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
+
+def sdt_libpthread__pthread_create_1_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, arg2, arg3, arg4, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u, arg1=%u, arg2=%u, arg3=%u, arg4=%u" % (__probe_ip, arg1, arg2, arg3, arg4)
 		pass
 
-def sdt_libpthread__pthread_join(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip):
+def sdt_libpthread__pthread_create_1_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, arg2, arg3, arg4):
+	sdt_libpthread__pthread_create_1_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, arg2, arg3, arg4, dummy_dict)
+
+def sdt_libpthread__pthread_join_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u" % (__probe_ip)
 		pass
 
-def sdt_libpthread__pthread_join_1(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip, arg1):
+def sdt_libpthread__pthread_join_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
+	sdt_libpthread__pthread_join_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
+
+def sdt_libpthread__pthread_join_1_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u, arg1=%u" % (__probe_ip, arg1)
 		pass
 
-def sdt_libpthread__pthread_join_ret(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip):
+def sdt_libpthread__pthread_join_1_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1):
+	sdt_libpthread__pthread_join_1_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, dummy_dict)
+
+def sdt_libpthread__pthread_join_ret_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u" % (__probe_ip)
 		pass
 
-def sdt_libpthread__mutex_acquired(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip):
+def sdt_libpthread__pthread_join_ret_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
+	sdt_libpthread__pthread_join_ret_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
+
+def sdt_libpthread__mutex_acquired_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u" % (__probe_ip)
 		pass
 
-def sdt_libpthread__mutex_acquired_1(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip, arg1):
+def sdt_libpthread__mutex_acquired_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
+	sdt_libpthread__mutex_acquired_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
+
+def sdt_libpthread__mutex_acquired_1_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u, arg1=%u" % (__probe_ip, arg1)
 		pass
 
-def sdt_libpthread__mutex_acquired_2(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip):
+def sdt_libpthread__mutex_acquired_1_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1):
+	sdt_libpthread__mutex_acquired_1_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1)
+
+def sdt_libpthread__mutex_acquired_2_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u" % (__probe_ip)
 		pass
 
-def sdt_libpthread__mutex_acquired_3(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip, arg1):
-		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
-		# print "__probe_ip=%u, arg1=%u" % (__probe_ip, arg1)
-		event = Event_mutex_acquired_7 (nsecs(common_secs,common_nsecs), common_cpu, arg1, common_pid)
-		process_event(event)
+def sdt_libpthread__mutex_acquired_2_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
+	sdt_libpthread__mutex_acquired_2_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
 
-def sdt_libpthread__mutex_acquired_4(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip):
-		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
-		# print "__probe_ip=%u" % \ (__probe_ip)
-		pass
-
-def sdt_libpthread__mutex_acquired_5(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip, arg1):
-		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
-		# print "__probe_ip=%u, arg1=%u" % (__probe_ip, arg1)
-		pass
-
-def sdt_libpthread__mutex_acquired_6(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip):
-		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
-		# print "__probe_ip=%u" % (__probe_ip)
-		pass
-
-def sdt_libpthread__mutex_acquired_7(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip, arg1):
+def sdt_libpthread__mutex_acquired_3_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u, arg1=%u" % (__probe_ip, arg1)
 		event = Event_mutex_acquired_7 (nsecs(common_secs,common_nsecs), common_cpu, arg1, common_pid)
 		process_event(event)
 
-def sdt_libpthread__mutex_destroy(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip):
+def sdt_libpthread__mutex_acquired_3_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1):
+	sdt_libpthread__mutex_acquired_3_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, dummy_dict)
+
+def sdt_libpthread__mutex_acquired_4_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, perf_sample_dict):
+		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
+		# print "__probe_ip=%u" % \ (__probe_ip)
+		pass
+
+def sdt_libpthread__mutex_acquired_4_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
+	sdt_libpthread__mutex_acquired_4_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
+
+def sdt_libpthread__mutex_acquired_5_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, perf_sample_dict):
+		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
+		# print "__probe_ip=%u, arg1=%u" % (__probe_ip, arg1)
+		pass
+
+def sdt_libpthread__mutex_acquired_5_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1):
+	sdt_libpthread__mutex_acquired_5_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, dummy_dict)
+
+def sdt_libpthread__mutex_acquired_6_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u" % (__probe_ip)
 		pass
 
-def sdt_libpthread__mutex_entry(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip):
+def sdt_libpthread__mutex_acquired_6_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
+	sdt_libpthread__mutex_acquired_6_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
+
+def sdt_libpthread__mutex_acquired_7_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, perf_sample_dict):
+		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
+		# print "__probe_ip=%u, arg1=%u" % (__probe_ip, arg1)
+		event = Event_mutex_acquired_7 (nsecs(common_secs,common_nsecs), common_cpu, arg1, common_pid)
+		process_event(event)
+
+def sdt_libpthread__mutex_acquired_7_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1):
+	sdt_libpthread__mutex_acquired_7_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, dummy_dict)
+
+def sdt_libpthread__mutex_destroy_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u" % (__probe_ip)
 		pass
 
-def sdt_libpthread__mutex_entry_1(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip, arg1):
+def sdt_libpthread__mutex_destroy_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
+	sdt_libpthread__mutex_destroy_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
+
+def sdt_libpthread__mutex_entry_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, perf_sample_dict):
+		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
+		# print "__probe_ip=%u" % (__probe_ip)
+		pass
+
+def sdt_libpthread__mutex_entry_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
+	sdt_libpthread__mutex_entry_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
+
+def sdt_libpthread__mutex_entry_1_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u, arg1=%u" % (__probe_ip, arg1)
 		event = Event_mutex_entry_3 (nsecs(common_secs,common_nsecs), common_cpu, arg1, common_pid)
 		process_event(event)
 
-def sdt_libpthread__mutex_entry_2(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip):
+def sdt_libpthread__mutex_entry_1_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1):
+	sdt_libpthread__mutex_entry_1_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, dummy_dict)
+
+def sdt_libpthread__mutex_entry_2_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u" % (__probe_ip)
 		pass
 
-def sdt_libpthread__mutex_entry_3(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1):
+def sdt_libpthread__mutex_entry_2_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
+	sdt_libpthread__mutex_entry_2_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
+
+def sdt_libpthread__mutex_entry_3_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u, arg1=%u" % (__probe_ip, arg1)
 		event = Event_mutex_entry_3 (nsecs(common_secs,common_nsecs), common_cpu, arg1, common_pid)
 		process_event(event)
 
-def sdt_libpthread__mutex_init(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip, arg1):
+def sdt_libpthread__mutex_entry_3_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1):
+	sdt_libpthread__mutex_entry_3_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, dummy_dict)
+
+def sdt_libpthread__mutex_init_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u" % \ (__probe_ip)
 		event = Event_mutex_init (nsecs(common_secs,common_nsecs), common_cpu, arg1, common_pid)
 		process_event(event)
 
-def sdt_libpthread__mutex_init_1(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip, arg1):
+def sdt_libpthread__mutex_init_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1):
+	sdt_libpthread__mutex_init_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, dummy_dict)
+
+def sdt_libpthread__mutex_init_1_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u, arg1=%u" % (__probe_ip, arg1)
 		event = Event_mutex_init (nsecs(common_secs,common_nsecs), common_cpu, arg1, common_pid)
 		process_event(event)
 
-def sdt_libpthread__mutex_release(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip):
+def sdt_libpthread__mutex_init_1_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1):
+	sdt_libpthread__mutex_init_1_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, dummy_dict)
+
+def sdt_libpthread__mutex_release_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u" % (__probe_ip)
 		pass
 
-def sdt_libpthread__mutex_release_1(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip, arg1):
+def sdt_libpthread__mutex_release_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
+	sdt_libpthread__mutex_release_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
+
+def sdt_libpthread__mutex_release_1_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u, arg1=%u" % (__probe_ip, arg1)
 		pass
 
-def sdt_libpthread__mutex_release_2(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip):
+def sdt_libpthread__mutex_release_1_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1):
+	sdt_libpthread__mutex_release_1_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, dummy_dict)
+
+def sdt_libpthread__mutex_release_2_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u" % \ (__probe_ip)
 		pass
 
-def sdt_libpthread__mutex_release_3(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip, arg1):
+def sdt_libpthread__mutex_release_2_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
+	sdt_libpthread__mutex_release_2_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
+
+def sdt_libpthread__mutex_release_3_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u, arg1=%u" % (__probe_ip, arg1)
 		event = Event_mutex_release_7 (nsecs(common_secs,common_nsecs), common_cpu, arg1, common_pid)
 		process_event(event)
 
-def sdt_libpthread__mutex_release_4(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip):
+def sdt_libpthread__mutex_release_3_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1):
+	sdt_libpthread__mutex_release_3_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, dummy_dict)
+
+def sdt_libpthread__mutex_release_4_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u" % (__probe_ip)
 		pass
 
-def sdt_libpthread__mutex_release_5(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip, arg1):
+def sdt_libpthread__mutex_release_4_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
+	sdt_libpthread__mutex_release_4_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
+
+def sdt_libpthread__mutex_release_5_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u, arg1=%u" % (__probe_ip, arg1)
 		pass
 
-def sdt_libpthread__mutex_release_6(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip):
+def sdt_libpthread__mutex_release_5_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1):
+	sdt_libpthread__mutex_release_5_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, dummy_dict)
+
+def sdt_libpthread__mutex_release_6_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u" % (__probe_ip)
 		pass
 
-def sdt_libpthread__mutex_release_7(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip, arg1):
+def sdt_libpthread__mutex_release_6_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
+	sdt_libpthread__mutex_release_6_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
+
+def sdt_libpthread__mutex_release_7_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u, arg1=%u" % (__probe_ip, arg1)
 		event = Event_mutex_release_7 (nsecs(common_secs,common_nsecs), common_cpu, arg1, common_pid)
 		process_event(event)
 
-def sdt_libpthread__pthread_start(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip):
+def sdt_libpthread__mutex_release_7_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1):
+	sdt_libpthread__mutex_release_7_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, dummy_dict)
+
+def sdt_libpthread__pthread_start_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u" % (__probe_ip)
 		pass
 
-def sdt_libpthread__pthread_start_1(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip, arg1, arg2, arg3):
+def sdt_libpthread__pthread_start_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
+	sdt_libpthread__pthread_start_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
+
+def sdt_libpthread__pthread_start_1_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, arg2, arg3, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u, arg1=%u, arg2=%u, arg3=%u" % (__probe_ip, arg1, arg2, arg3)
 		pass
 
-def probe_libpthread__pthread_mutex_lock(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip):
+def sdt_libpthread__pthread_start_1_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, arg2, arg3):
+	sdt_libpthread__pthread_start_1_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, arg1, arg2, arg3, dummy_dict)
+
+def probe_libpthread__pthread_mutex_lock_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u" % \ (__probe_ip)
 		pass
 
-def probe_libpthread__pthread_mutex_unlock(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip):
+def probe_libpthread__pthread_mutex_lock_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
+	probe_libpthread__pthread_mutex_lock_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
+
+def probe_libpthread__pthread_mutex_unlock_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u" % \ (__probe_ip)
 		pass
 
-def probe_libpthread__pthread_mutex_init(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
-	common_callchain, __probe_ip):
+def probe_libpthread__pthread_mutex_unlock_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
+	probe_libpthread__pthread_mutex_unlock_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
+
+def probe_libpthread__pthread_mutex_init_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, perf_sample_dict):
 		# print_header(event_name, common_cpu, common_secs, common_nsecs, common_pid, common_comm)
 		# print "__probe_ip=%u" % (__probe_ip)
 		pass
+
+def probe_libpthread__pthread_mutex_init_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
+	probe_libpthread__pthread_mutex_init_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
 
 def trace_unhandled(event_name, context, event_fields_dict):
 	#print "trace_unhandled %s" % (event_name)
@@ -650,3 +721,77 @@ def trace_unhandled(event_name, context, event_fields_dict):
 def print_header(event_name, cpu, secs, nsecs, pid, comm):
 	#print "%-20s %5u %05u.%09u %8u %-20s " % (event_name, cpu, secs, nsecs, pid, comm),
 	pass
+
+if params.api == 1:
+	dummy_dict = {}
+	dummy_dict['sample'] = {}
+	dummy_dict['sample']['pid'] = 'unknown'
+	sdt_libpthread__mutex_destroy_1 = sdt_libpthread__mutex_destroy_1_old
+	sdt_libpthread__pthread_create = sdt_libpthread__pthread_create_old
+	sdt_libpthread__pthread_create_1 = sdt_libpthread__pthread_create_1_old
+	sdt_libpthread__pthread_join = sdt_libpthread__pthread_join_old
+	sdt_libpthread__pthread_join_1 = sdt_libpthread__pthread_join_1_old
+	sdt_libpthread__pthread_join_ret = sdt_libpthread__pthread_join_ret_old
+	sdt_libpthread__mutex_acquired = sdt_libpthread__mutex_acquired_old
+	sdt_libpthread__mutex_acquired_1 = sdt_libpthread__mutex_acquired_1_old
+	sdt_libpthread__mutex_acquired_2 = sdt_libpthread__mutex_acquired_2_old
+	sdt_libpthread__mutex_acquired_3 = sdt_libpthread__mutex_acquired_3_old
+	sdt_libpthread__mutex_acquired_4 = sdt_libpthread__mutex_acquired_4_old
+	sdt_libpthread__mutex_acquired_5 = sdt_libpthread__mutex_acquired_5_old
+	sdt_libpthread__mutex_acquired_6 = sdt_libpthread__mutex_acquired_6_old
+	sdt_libpthread__mutex_acquired_7 = sdt_libpthread__mutex_acquired_7_old
+	sdt_libpthread__mutex_destroy = sdt_libpthread__mutex_destroy_old
+	sdt_libpthread__mutex_entry = sdt_libpthread__mutex_entry_old
+	sdt_libpthread__mutex_entry_1 = sdt_libpthread__mutex_entry_1_old
+	sdt_libpthread__mutex_entry_2 = sdt_libpthread__mutex_entry_2_old
+	sdt_libpthread__mutex_entry_3 = sdt_libpthread__mutex_entry_3_old
+	sdt_libpthread__mutex_init = sdt_libpthread__mutex_init_old
+	sdt_libpthread__mutex_init_1 = sdt_libpthread__mutex_init_1_old
+	sdt_libpthread__mutex_release = sdt_libpthread__mutex_release_old
+	sdt_libpthread__mutex_release_1 = sdt_libpthread__mutex_release_1_old
+	sdt_libpthread__mutex_release_2 = sdt_libpthread__mutex_release_2_old
+	sdt_libpthread__mutex_release_3 = sdt_libpthread__mutex_release_3_old
+	sdt_libpthread__mutex_release_4 = sdt_libpthread__mutex_release_4_old
+	sdt_libpthread__mutex_release_5 = sdt_libpthread__mutex_release_5_old
+	sdt_libpthread__mutex_release_6 = sdt_libpthread__mutex_release_6_old
+	sdt_libpthread__mutex_release_7 = sdt_libpthread__mutex_release_7_old
+	sdt_libpthread__pthread_start = sdt_libpthread__pthread_start_old
+	sdt_libpthread__pthread_start_1 = sdt_libpthread__pthread_start_1_old
+	probe_libpthread__pthread_mutex_lock = probe_libpthread__pthread_mutex_lock_old
+	probe_libpthread__pthread_mutex_unlock = probe_libpthread__pthread_mutex_unlock_old
+	probe_libpthread__pthread_mutex_init = probe_libpthread__pthread_mutex_init_old
+else:
+	sdt_libpthread__mutex_destroy_1 = sdt_libpthread__mutex_destroy_1_new
+	sdt_libpthread__pthread_create = sdt_libpthread__pthread_create_new
+	sdt_libpthread__pthread_create_1 = sdt_libpthread__pthread_create_1_new
+	sdt_libpthread__pthread_join = sdt_libpthread__pthread_join_new
+	sdt_libpthread__pthread_join_1 = sdt_libpthread__pthread_join_1_new
+	sdt_libpthread__pthread_join_ret = sdt_libpthread__pthread_join_ret_new
+	sdt_libpthread__mutex_acquired = sdt_libpthread__mutex_acquired_new
+	sdt_libpthread__mutex_acquired_1 = sdt_libpthread__mutex_acquired_1_new
+	sdt_libpthread__mutex_acquired_2 = sdt_libpthread__mutex_acquired_2_new
+	sdt_libpthread__mutex_acquired_3 = sdt_libpthread__mutex_acquired_3_new
+	sdt_libpthread__mutex_acquired_4 = sdt_libpthread__mutex_acquired_4_new
+	sdt_libpthread__mutex_acquired_5 = sdt_libpthread__mutex_acquired_5_new
+	sdt_libpthread__mutex_acquired_6 = sdt_libpthread__mutex_acquired_6_new
+	sdt_libpthread__mutex_acquired_7 = sdt_libpthread__mutex_acquired_7_new
+	sdt_libpthread__mutex_destroy = sdt_libpthread__mutex_destroy_new
+	sdt_libpthread__mutex_entry = sdt_libpthread__mutex_entry_new
+	sdt_libpthread__mutex_entry_1 = sdt_libpthread__mutex_entry_1_new
+	sdt_libpthread__mutex_entry_2 = sdt_libpthread__mutex_entry_2_new
+	sdt_libpthread__mutex_entry_3 = sdt_libpthread__mutex_entry_3_new
+	sdt_libpthread__mutex_init = sdt_libpthread__mutex_init_new
+	sdt_libpthread__mutex_init_1 = sdt_libpthread__mutex_init_1_new
+	sdt_libpthread__mutex_release = sdt_libpthread__mutex_release_new
+	sdt_libpthread__mutex_release_1 = sdt_libpthread__mutex_release_1_new
+	sdt_libpthread__mutex_release_2 = sdt_libpthread__mutex_release_2_new
+	sdt_libpthread__mutex_release_3 = sdt_libpthread__mutex_release_3_new
+	sdt_libpthread__mutex_release_4 = sdt_libpthread__mutex_release_4_new
+	sdt_libpthread__mutex_release_5 = sdt_libpthread__mutex_release_5_new
+	sdt_libpthread__mutex_release_6 = sdt_libpthread__mutex_release_6_new
+	sdt_libpthread__mutex_release_7 = sdt_libpthread__mutex_release_7_new
+	sdt_libpthread__pthread_start = sdt_libpthread__pthread_start_new
+	sdt_libpthread__pthread_start_1 = sdt_libpthread__pthread_start_1_new
+	probe_libpthread__pthread_mutex_lock = probe_libpthread__pthread_mutex_lock_new
+	probe_libpthread__pthread_mutex_unlock = probe_libpthread__pthread_mutex_unlock_new
+	probe_libpthread__pthread_mutex_init = probe_libpthread__pthread_mutex_init_new
