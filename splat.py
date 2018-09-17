@@ -124,9 +124,20 @@ except:
 
 def checkAPI(t, val, backtrace):
 	if t == TypeError and str(val).find('takes exactly'):
-		sys.argv.insert(1,"--api=1")
-		debug_print(sys.argv)
-		os.execvp(sys.argv[0],sys.argv)
+		# remove any existing "--api" parameters
+		new_argv = []
+		arg = 0
+		while arg < len(sys.argv):
+			if sys.argv[arg].find("--api=") != -1:
+				pass
+			elif sys.argv[arg] == "--api":
+				arg = arg+1
+			else:
+				new_argv.append(sys.argv[arg])
+			arg = arg+1
+		new_argv.insert(1,"--api=1")
+		debug_print(new_argv)
+		os.execvp(new_argv[0],new_argv)
 		sys.exit(1)
 	sys.__excepthook__(t, val, backtrace)
 
