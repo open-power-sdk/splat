@@ -69,7 +69,7 @@ parser.add_argument('file_or_command',
 		"the command string to record (with \"--record\")",
 	metavar='ARG',
 	default='perf.data')
-parser.add_argument('--api', type=int, help='use newer(2) perf API', default=1)
+parser.add_argument('--api', type=int, help='use newer(2) perf API', default=2)
 params = parser.parse_args()
 
 if params.record:
@@ -112,6 +112,25 @@ except:
 	debug_print(sys.argv)
 	os.execvp("perf", sys.argv)
 	sys.exit(1)
+
+# perf added an additional parameter to event handlers, perf_sample_dict,
+# in Linux 4.14 (commit a641860550f05a4b8889dca61aab73c84b2d5e16), which
+# altered the event handler API in a binary-incompatible way.
+# Using the new API on a system which does not support it results in an
+# exception like:
+#   TypeError: event__handler() takes exactly 11 arguments (10 given)
+# Here, we catch all exceptions, and if it seems to match the above
+# exception, we attempt to revert to the older perf event handler API.
+
+def checkAPI(t, val, backtrace):
+	if t == TypeError and str(val).find('takes exactly'):
+		sys.argv.insert(1,"--api=1")
+		debug_print(sys.argv)
+		os.execvp(sys.argv[0],sys.argv)
+		sys.exit(1)
+	sys.__excepthook__(t, val, backtrace)
+
+sys.excepthook = checkAPI
 
 from Core import *
 from Core import *
