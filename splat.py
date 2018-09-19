@@ -454,7 +454,7 @@ def mutexTotals():
 			tasks[tid].locks[lid].output_header()
 			break
 		# print mutex list
-		for lid in tasks[tid].locks:
+		for lid in sorted(tasks[tid].locks, key = lambda x: (tasks[tid].locks[x].acquired), reverse=True):
 			print "%16x" % (lid),
 			tasks[tid].locks[lid].output()
 			if lid not in locks:
@@ -467,7 +467,7 @@ def mutexTotals():
 	for lid in locks:
 		locks[lid].output_header()
 		break
-	for lid in locks:
+	for lid in sorted(locks, key = lambda x: (locks[x].acquired), reverse=True):
 		print "%16x" % (lid),
 		locks[lid].output()
 
