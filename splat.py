@@ -142,8 +142,10 @@ def checkAPI(t, val, backtrace):
 sys.excepthook = checkAPI
 
 from Core import *
-from Core import *
 from Util import *
+
+def ns2ms(nsecs):
+	return nsecs * 0.000001
 
 global start_timestamp, curr_timestamp
 start_timestamp = 0
@@ -264,13 +266,44 @@ class CPU:
 		running = self.user + self.sys + self.irq + self.hv + self.busy_unknown
 		print "| %5.1f%%" % ((float(running * 100) / float(running + self.idle)) if running > 0 else 0),
 
+locks = {}
+
+class LockStats (object):
+	def __init__(self):
+		self.attempted = 0
+		self.acquired = 0
+		self.released = 0
+		self.wait = 0 # delta between entry and acquired
+		self.wait_min = sys.maxint
+		self.wait_max = 0
+
+	def output_header(self):
+		print "%12s %12s %12s %12s %12s %12s %12s" % ("attempted", "acquired", "released", "wait", "wait avg", "wait min", "wait max")
+
+	def output(self):
+		print "%12u %12u %12u %12.6f %12.6f %12.6f %12.6f" % \
+			(self.attempted, self.acquired, self.released, \
+			ns2ms(self.wait), \
+			ns2ms(float(self.wait)/float(self.acquired)) if self.acquired > 0 else 0, \
+			ns2ms(self.wait_min) if self.acquired > 0 else 0, \
+			ns2ms(self.wait_max))
+
+	def accumulate(self, lockstat):
+		self.attempted += lockstat.attempted
+		self.acquired += lockstat.acquired
+		self.released += lockstat.released
+		self.wait += lockstat.wait
+		if self.wait_min > lockstat.wait_min:
+			self.wait_min = lockstat.wait_min
+		if self.wait_max < lockstat.wait_max:
+			self.wait_max = lockstat.wait_max
+
 class Task:
 	def __init__(self, timestamp, tid):
 		self.timestamp = timestamp
 		self.tid = tid
 		self.cpu = 'unknown'
 		self.cpus = {}
-		#self.locks = {}
 		self.functions = {}
 
 	def output_header(self):
@@ -288,20 +321,26 @@ tasks = {}
 class Function (object):
 
 	def __init__(self):
-		self.locks = {}
+		self.lockstats = {}
 
 def addLock(tid, func, lid):
 	try:
-		lock = tasks[tid].functions[func].locks[lid]
+		lock = locks[lid]
+	except:
+		lock = Lock()
+		locks[lid] = lock
+	try:
+		lockstats = tasks[tid].functions[func].lockstats[lid]
 	except:
 		try:
 			f = tasks[tid].functions[func]
 		except:
 			f = Function()
 			tasks[tid].functions[func] = f
-		lock = Lock()
-		tasks[tid].functions[func].locks[lid] = lock
-		debug_print("\tAdding new task.function.lock = %u.%s.0x%x" % (tid,func,lid))
+		lockstats = LockStats()
+		tasks[tid].functions[func].lockstats[lid] = lockstats
+
+	return lock
 
 class Event (object):
 
@@ -363,9 +402,12 @@ class Event_mutex_entry_3 ( Event ):
 
 		debug_print("[%7u] Inside Event_mutex_entry_3::process, lid = 0x%x" % (self.tid, self.lid))
 		task = super(Event_mutex_entry_3, self).process()
-		addLock(self.tid, self.function, self.lid)
+		lock = addLock(self.tid, self.function, self.lid)
 
-		task.functions[self.function].locks[self.lid].last_event = curr_timestamp
+		lock.attempted += 1
+		task.functions[self.function].lockstats[self.lid].attempted += 1
+
+		lock.last_event = curr_timestamp
 
 
 class Event_mutex_acquired_7 ( Event ):
@@ -385,21 +427,24 @@ class Event_mutex_acquired_7 ( Event ):
 
 		debug_print("[%7u] Inside Event_mutex_acquired_7::process, lid = 0x%x" % (self.tid, self.lid))
 		task = super(Event_mutex_acquired_7, self).process()
-		addLock(self.tid, self.function, self.lid)
+		lock = addLock(self.tid, self.function, self.lid)
+
+		lockstats = task.functions[self.function].lockstats[self.lid]
 
 		# wait = delta b/w mutex entry & acquired
-		waitTime = (curr_timestamp - task.functions[self.function].locks[self.lid].last_event)
-		task.functions[self.function].locks[self.lid].wait += waitTime
+		waitTime = (curr_timestamp - lock.last_event)
+		lockstats.wait += waitTime
 
 		# update min & max wait time
-		if (waitTime < task.functions[self.function].locks[self.lid].wait_min):
-			task.functions[self.function].locks[self.lid].wait_min = waitTime
+		if (waitTime < lockstats.wait_min):
+			lockstats.wait_min = waitTime
 
-		if (waitTime > task.functions[self.function].locks[self.lid].wait_max):
-			task.functions[self.function].locks[self.lid].wait_max = waitTime
+		if (waitTime > lockstats.wait_max):
+			lockstats.wait_max = waitTime
 
-		task.functions[self.function].locks[self.lid].last_event = curr_timestamp
-		task.functions[self.function].locks[self.lid].acquired += 1
+		lockstats.acquired += 1
+
+		lock.last_event = curr_timestamp
 
 
 class Event_mutex_release_7 ( Event ):
@@ -419,20 +464,21 @@ class Event_mutex_release_7 ( Event ):
 
 		debug_print("[%7u] Inside Event_mutex_release_7::process, lid = 0x%x" % (self.tid, self.lid))
 		task = super(Event_mutex_release_7, self).process()
-		addLock(self.tid, self.function, self.lid)
-
-		task.functions[self.function].locks[self.lid].released = curr_timestamp
+		lock = addLock(self.tid, self.function, self.lid)
 
 		# held = delta b/w mutex acquired & released
-		heldTime = (curr_timestamp - task.functions[self.function].locks[self.lid].last_event)
-		task.functions[self.function].locks[self.lid].held += heldTime
+		heldTime = (curr_timestamp - lock.last_event)
+		lock.held += heldTime
 
 		# update min & max held time
-		if (heldTime < task.functions[self.function].locks[self.lid].held_min):
-			task.functions[self.function].locks[self.lid].held_min = heldTime
+		if (heldTime < lock.held_min):
+			lock.held_min = heldTime
 
-		if (heldTime > task.functions[self.function].locks[self.lid].held_max):
-			task.functions[self.function].locks[self.lid].held_max = heldTime
+		if (heldTime > lock.held_max):
+			lock.held_max = heldTime
+
+		lock.released += 1
+		task.functions[self.function].lockstats[self.lid].released += 1
 
 
 #def sdt_libpthread__mutex_destroy_1_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
@@ -455,25 +501,25 @@ def trace_end():
 	mutexTotals()
 
 def mutexTotals():
-	locks = {}
+	lockstats = {}
 	# print header
 	# print "%20s" % (''),
 	for tid in tasks:
 		print ""
 		print "Task [%9u]" % (tid)
 		for func in tasks[tid].functions:
-			print "\tFunction \"%s\"" % (func)
-			for lid in tasks[tid].functions[func].locks:
+			print "  Function \"%s\"" % (func)
+			for lid in tasks[tid].functions[func].lockstats:
 				print "            lock",
-				tasks[tid].functions[func].locks[lid].output_header()
+				tasks[tid].functions[func].lockstats[lid].output_header()
 				break
 			# print mutex list
-			for lid in sorted(tasks[tid].functions[func].locks, key = lambda x: (tasks[tid].functions[func].locks[x].acquired), reverse=True):
+			for lid in sorted(tasks[tid].functions[func].lockstats, key = lambda x: (tasks[tid].functions[func].lockstats[x].acquired), reverse=True):
 				print "%16x" % (lid),
-				tasks[tid].functions[func].locks[lid].output()
-				if lid not in locks:
-					locks[lid] = Lock()
-				locks[lid].accumulate(tasks[tid].functions[func].locks[lid])
+				tasks[tid].functions[func].lockstats[lid].output()
+				if lid not in lockstats:
+					lockstats[lid] = LockStats()
+				lockstats[lid].accumulate(tasks[tid].functions[func].lockstats[lid])
 
 	print ""
 	print "Task [%9s]" % ("ALL")
@@ -481,6 +527,11 @@ def mutexTotals():
 	for lid in locks:
 		locks[lid].output_header()
 		break
+	for lid in locks:
+		locks[lid].acquired = lockstats[lid].acquired
+		locks[lid].wait = lockstats[lid].wait
+		locks[lid].wait_min = lockstats[lid].wait_min
+		locks[lid].wait_max = lockstats[lid].wait_max
 	for lid in sorted(locks, key = lambda x: (locks[x].acquired), reverse=True):
 		print "%16x" % (lid),
 		locks[lid].output()
@@ -488,14 +539,19 @@ def mutexTotals():
 def get_caller(callchain):
 	try:
 		caller = callchain[1]['sym']['name']
+		try:
+			offset = callchain[1]['ip'] - callchain[1]['sym']['start']
+			caller = caller + "+0x%x" % offset
+		except:
+			pass
 	except:
 		try:
 			caller = callchain[1]['dso']
-			#try:
-			#	offset = callchain[1]['ip']
-			#	caller = caller + "+0x%x" % offset
-			#except:
-			#	pass
+			try:
+				offset = callchain[1]['ip']
+				caller = caller + "+0x%x" % offset
+			except:
+				pass
 		except:
 			caller = 'unknown'
 	return caller
