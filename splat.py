@@ -139,8 +139,6 @@ def checkAPI(t, val, backtrace):
 		sys.exit(1)
 	sys.__excepthook__(t, val, backtrace)
 
-sys.excepthook = checkAPI
-
 from Core import *
 from Util import *
 
@@ -276,17 +274,24 @@ class LockStats (object):
 		self.wait = 0 # delta between entry and acquired
 		self.wait_min = sys.maxint
 		self.wait_max = 0
+		self.held = 0 # delta between acquired and release
+		self.held_min = sys.maxint
+		self.held_max = 0
 
 	def output_header(self):
-		print "%12s %12s %12s %12s %12s %12s %12s" % ("attempted", "acquired", "released", "wait", "wait avg", "wait min", "wait max")
+		print "%12s %12s %12s %12s %12s %12s %12s %12s %12s %12s %12s" % ("attempted", "acquired", "released", "wait", "wait avg", "wait min", "wait max", "held", "held avg", "held min", "held max")
 
 	def output(self):
-		print "%12u %12u %12u %12.6f %12.6f %12.6f %12.6f" % \
+		print "%12u %12u %12u %12.6f %12.6f %12.6f %12.6f %12.6f %12.6f %12.6f %12.6f" % \
 			(self.attempted, self.acquired, self.released, \
 			ns2ms(self.wait), \
 			ns2ms(float(self.wait)/float(self.acquired)) if self.acquired > 0 else 0, \
 			ns2ms(self.wait_min) if self.acquired > 0 else 0, \
-			ns2ms(self.wait_max))
+			ns2ms(self.wait_max),
+			ns2ms(self.held), \
+			ns2ms(float(self.held)/float(self.released)) if self.released > 0 else 0, \
+			ns2ms(self.held_min) if self.released > 0 else 0, \
+			ns2ms(self.held_max))
 
 	def accumulate(self, lockstat):
 		self.attempted += lockstat.attempted
@@ -297,6 +302,11 @@ class LockStats (object):
 			self.wait_min = lockstat.wait_min
 		if self.wait_max < lockstat.wait_max:
 			self.wait_max = lockstat.wait_max
+		self.held += lockstat.held
+		if self.held_min > lockstat.held_min:
+			self.held_min = lockstat.held_min
+		if self.held_max < lockstat.held_max:
+			self.held_max = lockstat.held_max
 
 class Task:
 	def __init__(self, timestamp, tid):
@@ -404,8 +414,9 @@ class Event_mutex_entry_3 ( Event ):
 		task = super(Event_mutex_entry_3, self).process()
 		lock = addLock(self.tid, self.function, self.lid)
 
-		lock.attempted += 1
-		task.functions[self.function].lockstats[self.lid].attempted += 1
+		lockstats = task.functions[self.function].lockstats[self.lid]
+
+		lockstats.attempted += 1
 
 		lock.last_event = curr_timestamp
 
@@ -466,19 +477,20 @@ class Event_mutex_release_7 ( Event ):
 		task = super(Event_mutex_release_7, self).process()
 		lock = addLock(self.tid, self.function, self.lid)
 
+		lockstats = task.functions[self.function].lockstats[self.lid]
+
 		# held = delta b/w mutex acquired & released
 		heldTime = (curr_timestamp - lock.last_event)
-		lock.held += heldTime
+		lockstats.held += heldTime
 
 		# update min & max held time
-		if (heldTime < lock.held_min):
-			lock.held_min = heldTime
+		if (heldTime < lockstats.held_min):
+			lockstats.held_min = heldTime
 
-		if (heldTime > lock.held_max):
-			lock.held_max = heldTime
+		if (heldTime > lockstats.held_max):
+			lockstats.held_max = heldTime
 
-		lock.released += 1
-		task.functions[self.function].lockstats[self.lid].released += 1
+		lockstats.released += 1
 
 
 #def sdt_libpthread__mutex_destroy_1_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm,
@@ -528,10 +540,15 @@ def mutexTotals():
 		locks[lid].output_header()
 		break
 	for lid in locks:
-		locks[lid].acquired = lockstats[lid].acquired
+		locks[lid].attempted = lockstats[lid].attempted
 		locks[lid].wait = lockstats[lid].wait
 		locks[lid].wait_min = lockstats[lid].wait_min
 		locks[lid].wait_max = lockstats[lid].wait_max
+		locks[lid].acquired = lockstats[lid].acquired
+		locks[lid].held = lockstats[lid].held
+		locks[lid].held_min = lockstats[lid].held_min
+		locks[lid].held_max = lockstats[lid].held_max
+		locks[lid].released = lockstats[lid].released
 	for lid in sorted(locks, key = lambda x: (locks[x].acquired), reverse=True):
 		print "%16x" % (lid),
 		locks[lid].output()
@@ -853,6 +870,7 @@ if params.api == 1:
 	probe_libpthread__pthread_mutex_unlock = probe_libpthread__pthread_mutex_unlock_old
 #	probe_libpthread__pthread_mutex_init = probe_libpthread__pthread_mutex_init_old
 else:
+	sys.excepthook = checkAPI
 #	sdt_libpthread__mutex_destroy_1 = sdt_libpthread__mutex_destroy_1_new
 	sdt_libpthread__pthread_create = sdt_libpthread__pthread_create_new
 	sdt_libpthread__pthread_create_1 = sdt_libpthread__pthread_create_1_new
