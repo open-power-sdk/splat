@@ -23,7 +23,8 @@ void* critSection(void *arg)
 
     int i;
     for (i = 0; i < NITERS; i++) {
-        pthread_mutex_lock(&lock2);
+	while (pthread_mutex_trylock(&lock2) != 0)
+		usleep(100);
  
         sleep(1);
 

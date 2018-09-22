@@ -86,7 +86,7 @@ if params.record:
 	if 'all' not in groups:
 		print "Only 'all' is currently supported for recording groups."
 		sys.exit(1)
-	eventlist = 'sdt_libpthread:*' # hack, should be refined
+	eventlist = 'sdt_libpthread:*,probe_libpthread:*' # hack, should be refined
 	eventlist = '{' + eventlist + '}'
 	command = ['perf', 'record', '--quiet', '--all-cpus', '-g',
 		'--event', eventlist ] + params.file_or_command
@@ -172,10 +172,11 @@ def process_event(event):
 class Lock:
 	def __init__(self):
 		self.timestamp = 0 # mutex initialization time
-		self.acquired = 0
 		self.last_event = 0 # recording last event time
-		self.released = 0
 		self.attempted = 0
+		self.failed = 0
+		self.acquired = 0
+		self.released = 0
 		self.held = 0 # delta between acquired and release
 		self.held_min = sys.maxint
 		self.held_max = 0
@@ -186,6 +187,7 @@ class Lock:
 
 	def accumulate(self, lock):
 		self.acquired += lock.acquired
+		self.failed += lock.failed
 		self.released += lock.released
 		self.attempted += lock.attempted
 		self.held += lock.held
@@ -200,7 +202,7 @@ class Lock:
 			self.wait_max = lock.wait_max
 
 	def output_header(self):
-		print "%12s %12s %12s %12s %12s %12s %12s %12s %12s" % ("acquired", "waited", "minWait", "maxWait", "avgWait", "held", "minHeld", "maxHeld", "avgHeld")
+		print "%12s %12s %12s %12s %12s %12s %12s %12s %12s %12s" % ("acquired", "failed", "waited", "minWait", "maxWait", "avgWait", "held", "minHeld", "maxHeld", "avgHeld")
 
 	def output(self):
 		# compute average wait and hold times
@@ -219,8 +221,8 @@ class Lock:
 		if held_min == sys.maxint:
 			held_min = 0
 
-		print "%12u %12.3f %12.3f %12.3f %12.3f %12.3f %12.3f %12.3f %12.3f" \
-		      % (self.acquired, \
+		print "%12u %12u %12.3f %12.3f %12.3f %12.3f %12.3f %12.3f %12.3f %12.3f" \
+		      % (self.acquired, self.failed, \
 			 float(self.wait)/1000000.0, float(wait_min)/1000000.0, float(self.wait_max)/float(1000000.0), avgWait, \
 			 float(self.held)/1000000.0, float(held_min)/1000000.0, float(self.held_max)/float(1000000.0), avgHeld  )
 
@@ -269,6 +271,7 @@ locks = {}
 class LockStats (object):
 	def __init__(self):
 		self.attempted = 0
+		self.failed = 0
 		self.acquired = 0
 		self.released = 0
 		self.wait = 0 # delta between entry and acquired
@@ -279,11 +282,11 @@ class LockStats (object):
 		self.held_max = 0
 
 	def output_header(self):
-		print "%12s %12s %12s %12s %12s %12s %12s %12s %12s %12s %12s" % ("attempted", "acquired", "released", "wait", "wait avg", "wait min", "wait max", "held", "held avg", "held min", "held max")
+		print "%12s %12s %12s %12s %12s %12s %12s %12s %12s %12s %12s %12s" % ("attempted", "failed", "acquired", "released", "wait", "wait avg", "wait min", "wait max", "held", "held avg", "held min", "held max")
 
 	def output(self):
-		print "%12u %12u %12u %12.6f %12.6f %12.6f %12.6f %12.6f %12.6f %12.6f %12.6f" % \
-			(self.attempted, self.acquired, self.released, \
+		print "%12u %12u %12u %12u %12.6f %12.6f %12.6f %12.6f %12.6f %12.6f %12.6f %12.6f" % \
+			(self.attempted, self.failed, self.acquired, self.released, \
 			ns2ms(self.wait), \
 			ns2ms(float(self.wait)/float(self.acquired)) if self.acquired > 0 else 0, \
 			ns2ms(self.wait_min) if self.acquired > 0 else 0, \
@@ -295,6 +298,7 @@ class LockStats (object):
 
 	def accumulate(self, lockstat):
 		self.attempted += lockstat.attempted
+		self.failed += lockstat.failed
 		self.acquired += lockstat.acquired
 		self.released += lockstat.released
 		self.wait += lockstat.wait
@@ -315,6 +319,7 @@ class Task:
 		self.cpu = 'unknown'
 		self.cpus = {}
 		self.functions = {}
+		self.trying_lid = 0
 
 	def output_header(self):
 		print "     -- [%8s] %-20s %3s" % ("task", "command", "cpu"),
@@ -412,11 +417,40 @@ class Event_mutex_entry_3 ( Event ):
 
 		debug_print("[%7u] Inside Event_mutex_entry_3::process, lid = 0x%x" % (self.tid, self.lid))
 		task = super(Event_mutex_entry_3, self).process()
+		task.trying_lid = self.lid
+		task.trying_function = self.function
 		lock = addLock(self.tid, self.function, self.lid)
 
 		lockstats = task.functions[self.function].lockstats[self.lid]
 
 		lockstats.attempted += 1
+
+		lock.last_event = curr_timestamp
+
+class Event_mutex_fail ( Event ):
+
+	def __init__(self, timestamp, cpu, lid, tid, func):
+		self.timestamp = timestamp
+		self.cpu = cpu
+		self.lid = lid
+		self.tid = tid
+		self.function = func
+
+	def process(self):
+		global start_timestamp, curr_timestamp
+		curr_timestamp = self.timestamp
+		if (start_timestamp == 0):
+			start_timestamp = curr_timestamp
+
+		task = super(Event_mutex_fail, self).process()
+		self.lid = task.trying_lid
+		self.function = task.trying_function
+		debug_print("[%7u] Inside Event_mutex_fail::process, lid = 0x%x" % (self.tid, self.lid))
+		lock = addLock(self.tid, self.function, self.lid)
+
+		lockstats = task.functions[self.function].lockstats[self.lid]
+
+		lockstats.failed += 1
 
 		lock.last_event = curr_timestamp
 
@@ -436,8 +470,11 @@ class Event_mutex_acquired_7 ( Event ):
 		if (start_timestamp == 0):
 			start_timestamp = curr_timestamp
 
-		debug_print("[%7u] Inside Event_mutex_acquired_7::process, lid = 0x%x" % (self.tid, self.lid))
 		task = super(Event_mutex_acquired_7, self).process()
+		if self.lid == 0:
+			self.lid = task.trying_lid
+			self.function = task.trying_function
+		debug_print("[%7u] Inside Event_mutex_acquired_7::process, lid = 0x%x" % (self.tid, self.lid))
 		lock = addLock(self.tid, self.function, self.lid)
 
 		lockstats = task.functions[self.function].lockstats[self.lid]
@@ -541,6 +578,7 @@ def mutexTotals():
 		break
 	for lid in locks:
 		locks[lid].attempted = lockstats[lid].attempted
+		locks[lid].failed = lockstats[lid].failed
 		locks[lid].wait = lockstats[lid].wait
 		locks[lid].wait_min = lockstats[lid].wait_min
 		locks[lid].wait_max = lockstats[lid].wait_max
@@ -821,6 +859,23 @@ def probe_libpthread__pthread_mutex_unlock_old(event_name, context, common_cpu, 
 
 #def probe_libpthread__pthread_mutex_init_old(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip):
 #	probe_libpthread__pthread_mutex_init_new(event_name, context, common_cpu, common_secs, common_nsecs, common_pid, common_comm, common_callchain, __probe_ip, dummy_dict)
+
+def probe_libpthread__pthread_mutex_trylock(event_name, context, common_cpu,
+        common_secs, common_nsecs, common_pid, common_comm,
+        common_callchain, __probe_ip, mutex):
+	event = Event_mutex_entry_3 (nsecs(common_secs,common_nsecs), common_cpu, mutex, common_pid, get_caller(common_callchain))
+	process_event(event)
+
+def probe_libpthread__pthread_mutex_trylock_ret(event_name, context, common_cpu,
+        common_secs, common_nsecs, common_pid, common_comm,
+        common_callchain, __probe_func, __probe_ret_ip, ret):
+
+	if (ret == 0):
+		event = Event_mutex_acquired_7 (nsecs(common_secs,common_nsecs), common_cpu, 0, common_pid, get_caller(common_callchain))
+	else:
+		event = Event_mutex_fail (nsecs(common_secs,common_nsecs), common_cpu, 0, common_pid, get_caller(common_callchain))
+	
+	process_event(event)
 
 def trace_unhandled(event_name, context, event_fields_dict):
 	#print "trace_unhandled %s" % (event_name)
