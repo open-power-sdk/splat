@@ -50,7 +50,7 @@ Currently, the only project file used in processing is `splat.py`.  One could do
 
 ### Define and enable tracepoints
 
-1. With superuser privileges, `./addprobes.py`
+1. With superuser privileges, `./addprobes.sh`
 
 
 ### Collect and process trace data in one step
